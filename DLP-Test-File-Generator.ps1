@@ -784,12 +784,21 @@ function Invoke-FileGeneration {
         try {
             $filePath = New-TestFile -OutputPath $OutputPath -FileType $fileType -ContentType $contentType
             
+            # Ensure file exists and get size safely
+            $fileSize = 0
+            if (Test-Path $filePath) {
+                $fileItem = Get-Item -LiteralPath $filePath -ErrorAction SilentlyContinue
+                if ($fileItem) {
+                    $fileSize = $fileItem.Length
+                }
+            }
+            
             $fileInfo = @{
                 Path = $filePath
                 ContentType = $contentType
                 FileType = $fileType
                 Created = (Get-Date -Format "o")
-                Size = (Get-Item $filePath).Length
+                Size = $fileSize
             }
             
             $createdFiles += $fileInfo
