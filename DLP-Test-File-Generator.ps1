@@ -496,7 +496,7 @@ TRANSACTION HISTORY
 DATE        DESCRIPTION                 AMOUNT
 ----        -----------                 ------
 $($transactions | ForEach-Object {
-    "$($_.Date)      $($_.Description.PadRight(25)) $(if($_.Amount -ge 0){'+'})$($_.Amount.ToString('N2'))"
+    "$($_.Date)      $($_.Description.ToString().PadRight(25)) $(if($_.Amount -ge 0){'+'})$($_.Amount.ToString('N2'))"
 } | Out-String)
 
 ═══════════════════════════════════════════════════════════════
@@ -557,7 +557,7 @@ NAME                          SSN              VERIFIED
     
     1..25 | ForEach-Object {
         $name = Get-RandomName
-        $output += "$($name.PadRight(30))$(Get-FakeSSN)     Yes`n"
+        $output += "$($name.ToString().PadRight(30))$(Get-FakeSSN)     Yes`n"
     }
     
     $output += @"
@@ -869,13 +869,13 @@ function Invoke-FileGeneration {
     # Breakdown by content type
     Write-Host "  Content Type Breakdown:" -ForegroundColor Yellow
     $createdFiles | Group-Object -Property ContentType | Sort-Object Count -Descending | ForEach-Object {
-        Write-Host "    $($_.Name.PadRight(15)) : $($_.Count) files" -ForegroundColor Gray
+        Write-Host "    $($_.Name.ToString().PadRight(15)) : $($_.Count) files" -ForegroundColor Gray
     }
     
     Write-Host ""
     Write-Host "  File Type Breakdown:" -ForegroundColor Yellow
     $createdFiles | Group-Object -Property FileType | Sort-Object Count -Descending | ForEach-Object {
-        Write-Host "    $($_.Name.PadRight(8)) : $($_.Count) files" -ForegroundColor Gray
+        Write-Host "    $($_.Name.ToString().PadRight(8)) : $($_.Count) files" -ForegroundColor Gray
     }
     
     Write-Host ""
