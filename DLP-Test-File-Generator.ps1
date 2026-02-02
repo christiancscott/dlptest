@@ -72,9 +72,9 @@ function Get-RandomName {
 function Get-FakeSSN {
     # Generate fake SSN using invalid area numbers (900-999 range which is not assigned)
     # This ensures the SSN cannot belong to a real person
-    $area = Get-Random -Minimum 900 -Maximum 999
-    $group = Get-Random -Minimum 10 -Maximum 99
-    $serial = Get-Random -Minimum 1000 -Maximum 9999
+    $area = Get-Random -Minimum 900 -Maximum 1000
+    $group = Get-Random -Minimum 10 -Maximum 100
+    $serial = Get-Random -Minimum 1000 -Maximum 10000
     return "$area-$group-$serial"
 }
 
@@ -140,9 +140,9 @@ function Get-FakePhone {
 }
 
 function Get-FakeDOB {
-    $year = Get-Random -Minimum 1950 -Maximum 2005
-    $month = Get-Random -Minimum 1 -Maximum 12
-    $day = Get-Random -Minimum 1 -Maximum 28
+    $year = Get-Random -Minimum 1950 -Maximum 2006
+    $month = Get-Random -Minimum 1 -Maximum 13
+    $day = Get-Random -Minimum 1 -Maximum 29
     return (Get-Date -Year $year -Month $month -Day $day).ToString("MM/dd/yyyy")
 }
 
@@ -218,12 +218,15 @@ TEST DATA - NOT A REAL PERSON
 function New-FinancialReport {
     $ccNumbers = 1..5 | ForEach-Object { Get-FakeCreditCard }
     $customers = 1..5 | ForEach-Object { 
-        @{
+        [PSCustomObject]@{
             Name = Get-RandomName
             Card = Get-FakeCreditCard
             Amount = Get-Random -Minimum 100 -Maximum 10000
         }
     }
+    
+    $totalAmount = ($customers | Measure-Object -Property Amount -Sum).Sum
+    if ($null -eq $totalAmount) { $totalAmount = 0 }
     
     return @"
 ═══════════════════════════════════════════════════════════════
@@ -244,7 +247,7 @@ Transaction ID: TXN$(Get-Random -Minimum 100000000 -Maximum 999999999)
 SUMMARY
 -------
 Total Transactions: $($customers.Count)
-Total Amount: `$(($customers | Measure-Object -Property Amount -Sum).Sum.ToString('N2'))
+Total Amount: `$$($totalAmount.ToString('N2'))
 
 ═══════════════════════════════════════════════════════════════
 CONTAINS PAYMENT CARD INDUSTRY (PCI) DATA - RESTRICTED ACCESS
@@ -440,7 +443,7 @@ function New-BankStatement {
     $balance = Get-Random -Minimum 1000 -Maximum 50000
     
     $transactions = 1..15 | ForEach-Object {
-        @{
+        [PSCustomObject]@{
             Date = (Get-Date).AddDays(-$_).ToString("MM/dd")
             Description = @('Direct Deposit', 'ATM Withdrawal', 'Online Transfer', 'Debit Card', 
                           'Check #' + (Get-Random -Minimum 1000 -Maximum 9999), 'ACH Payment',
@@ -452,6 +455,13 @@ function New-BankStatement {
                      }
         }
     }
+    
+    # Calculate totals safely
+    $totalDeposits = ($transactions | Where-Object { $_.Amount -gt 0 } | Measure-Object -Property Amount -Sum).Sum
+    if ($null -eq $totalDeposits) { $totalDeposits = 0 }
+    $totalWithdrawals = ($transactions | Where-Object { $_.Amount -lt 0 } | Measure-Object -Property Amount -Sum).Sum
+    if ($null -eq $totalWithdrawals) { $totalWithdrawals = 0 }
+    $endingBalance = $balance + $totalDeposits + $totalWithdrawals
     
     return @"
 ═══════════════════════════════════════════════════════════════
@@ -471,9 +481,9 @@ Account Type:       Personal Checking
 ACCOUNT SUMMARY
 ---------------
 Beginning Balance:  `$$($balance.ToString('N2'))
-Total Deposits:     `$(($transactions | Where-Object { $_.Amount -gt 0 } | Measure-Object -Property Amount -Sum).Sum.ToString('N2'))
-Total Withdrawals:  `$$(([Math]::Abs(($transactions | Where-Object { $_.Amount -lt 0 } | Measure-Object -Property Amount -Sum).Sum)).ToString('N2'))
-Ending Balance:     `$(($balance + ($transactions | Measure-Object -Property Amount -Sum).Sum).ToString('N2'))
+Total Deposits:     `$$($totalDeposits.ToString('N2'))
+Total Withdrawals:  `$$(([Math]::Abs($totalWithdrawals)).ToString('N2'))
+Ending Balance:     `$$($endingBalance.ToString('N2'))
 
 TRANSACTION HISTORY
 -------------------
@@ -570,10 +580,10 @@ CARD_NUMBER,EXPIRY,CVV,CARDHOLDER,AMOUNT
     
     1..30 | ForEach-Object {
         $name = Get-RandomName
-        $month = (Get-Random -Minimum 1 -Maximum 12).ToString("00")
-        $year = (Get-Random -Minimum 25 -Maximum 29).ToString("00")
-        $cvv = Get-Random -Minimum 100 -Maximum 999
-        $amount = Get-Random -Minimum 10 -Maximum 5000
+        $month = (Get-Random -Minimum 1 -Maximum 13).ToString("00")
+        $year = (Get-Random -Minimum 25 -Maximum 30).ToString("00")
+        $cvv = Get-Random -Minimum 100 -Maximum 1000
+        $amount = Get-Random -Minimum 10 -Maximum 5001
         $output += "$(Get-FakeCreditCard),$month/$year,$cvv,$name,`$$($amount.ToString('N2'))`n"
     }
     
@@ -662,6 +672,8 @@ $content
         }
         'html' {
             $path = Join-Path $OutputPath "$baseName.html"
+            # HTML encode without relying on System.Web
+            $encodedContent = $content -replace '&', '&amp;' -replace '<', '&lt;' -replace '>', '&gt;' -replace '"', '&quot;'
             @"
 <!DOCTYPE html>
 <html>
@@ -677,7 +689,7 @@ $content
     <h1>$ContentType Document</h1>
     <p class="warning">⚠️ TEST DATA - FOR DLP TESTING ONLY</p>
     <p>Generated: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")</p>
-    <pre>$([System.Web.HttpUtility]::HtmlEncode($content))</pre>
+    <pre>$encodedContent</pre>
 </body>
 </html>
 "@ | Out-File -FilePath $path -Encoding UTF8
@@ -793,7 +805,7 @@ function Invoke-FileGeneration {
                 }
             }
             
-            $fileInfo = @{
+            $fileInfo = [PSCustomObject]@{
                 Path = $filePath
                 ContentType = $contentType
                 FileType = $fileType
@@ -819,11 +831,14 @@ function Invoke-FileGeneration {
     Write-Progress -Activity "Generating DLP Test Files" -Completed
     
     # Save tracking information
+    $totalSize = ($createdFiles | Measure-Object -Property Size -Sum).Sum
+    if ($null -eq $totalSize) { $totalSize = 0 }
+    
     $trackingData = @{
         GeneratedAt = (Get-Date -Format "o")
         OutputPath = $OutputPath
         TotalFiles = $createdFiles.Count
-        TotalSize = ($createdFiles | Measure-Object -Property Size -Sum).Sum
+        TotalSize = $totalSize
         Files = $createdFiles
     }
     
