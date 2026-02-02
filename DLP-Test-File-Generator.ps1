@@ -84,15 +84,20 @@ function Get-FakeCreditCard {
     # Generate fake credit card numbers using test/invalid ranges
     # These use industry-standard test prefixes that will never be real cards
     
+    # Helper to generate random digits as a string (avoids int overflow)
+    function Get-RandomDigits([int]$count) {
+        -join (1..$count | ForEach-Object { Get-Random -Minimum 0 -Maximum 10 })
+    }
+    
     $types = @{
         'visa_test' = '4111111111111111'      # Standard Visa test number
         'mc_test' = '5500000000000004'         # Standard MC test number  
         'amex_test' = '340000000000009'        # Standard Amex test number
         'discover_test' = '6011000000000004'   # Standard Discover test number
-        # Generate random-looking but invalid numbers
-        'visa_fake' = "4$(Get-Random -Minimum 100000000000000 -Maximum 999999999999999)"
-        'mc_fake' = "5$(Get-Random -Minimum 100000000000000 -Maximum 599999999999999)"
-        'amex_fake' = "3$(Get-Random -Minimum 40000000000000 -Maximum 79999999999999)"
+        # Generate random-looking but invalid numbers (built as strings to avoid overflow)
+        'visa_fake' = "4$(Get-RandomDigits 15)"
+        'mc_fake' = "5$(Get-RandomDigits 15)"
+        'amex_fake' = "34$(Get-RandomDigits 13)"
     }
     
     if ($Type -eq "random") {
@@ -104,11 +109,12 @@ function Get-FakeCreditCard {
 function Get-FakeBankAccount {
     # Generate fake routing and account numbers
     # Using 000000000 prefix for routing (invalid) and random account
-    $routing = "0$(Get-Random -Minimum 10000000 -Maximum 99999999)"
-    $account = Get-Random -Minimum 100000000000 -Maximum 999999999999
+    $routing = "0$(Get-Random -Minimum 10000000 -Maximum 100000000)"
+    # Build account number as string to avoid int overflow
+    $account = "$(Get-Random -Minimum 100000 -Maximum 1000000)$(Get-Random -Minimum 100000 -Maximum 1000000)"
     return @{
         Routing = $routing
-        Account = $account.ToString()
+        Account = $account
     }
 }
 
